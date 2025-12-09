@@ -1,0 +1,110 @@
+//OJO QUE ESTA PUESTO MI CELU, HAY QUE CAMBIARLO PARA QUE LE MANDE EL COMANDO EL OTRO ARDUINO
+
+#include <SoftwareSerial.h>
+
+/* =====================
+   CONFIGURACION SIM800L
+   =====================*/
+SoftwareSerial mySerial(3, 2);   // TX=2, RX=3 del Arduino
+const char* numeroDestino = "++5492233426047";
+
+/* =====================
+   CONFIGURACION BOTON
+   =====================*/
+const int boton = 7;
+
+/* PROTOTIPOS */
+void updateSerial(int wait = 500);
+void enviarSMS();
+
+/* =====================
+         SETUP
+   =====================*/
+void setup() {
+  pinMode(boton, INPUT_PULLUP);   // Botón con pull-up interno
+  Serial.begin(9600);
+  mySerial.begin(9600);
+
+  Serial.println("==================================");
+  Serial.println("SIM800L: Inicializando y Configuracion");
+  Serial.println("==================================");
+  delay(1000);
+
+  Serial.print("Comprobando modulo (AT)... ");
+  mySerial.println("AT"); 
+  updateSerial(1500);
+
+  Serial.print("Configurando modo TEXTO... ");
+  mySerial.println("AT+CMGF=1");
+  updateSerial();
+  
+  Serial.print("Configurando recepcion (CNMI)... ");
+  mySerial.println("AT+CNMI=1,2,0,0,0");
+  updateSerial();
+
+  Serial.println("Configuracion Finalizada. El modulo esta listo para RECIBIR.");
+  Serial.println("==================================");
+  Serial.println("Para ENVIAR manualmente, escriba 'ENVIAR' en el Monitor Serial.");
+  Serial.println("O simplemente pulse el BOTON.");
+  Serial.println("==================================");
+}
+
+/* =====================
+          LOOP
+   =====================*/
+void loop() {
+
+  /* ---- LECTURA DE RESPUESTAS DEL SIM800L ---- */
+  while (mySerial.available()) {
+    Serial.write(mySerial.read());
+  }
+
+  /* ---- ENVIO MANUAL DESDE MONITOR SERIAL ---- */
+  if (Serial.available()) {
+    String comando = Serial.readStringUntil('\n');
+    comando.trim();
+    comando.toUpperCase();
+    
+    if (comando == "ENVIAR") {
+      enviarSMS();
+    }
+  }
+
+  /* ---- ENVIO AUTOMATICO POR BOTON ---- */
+  if (digitalRead(boton) == LOW) {   // LOW = pulsado
+    Serial.println("Boton pulsado → Enviando SMS...");
+    enviarSMS();
+    delay(300);   // Anti-rebote
+  }
+}
+
+/* =====================
+       FUNCION ENVIO
+   =====================*/
+void enviarSMS() {
+  Serial.println("--- INICIANDO ENVIO DE SMS ---");
+
+  mySerial.print("AT+CMGS=\"");
+  mySerial.print(numeroDestino);
+  mySerial.println("\"");
+
+  updateSerial(2000);
+
+  mySerial.print("enviar");
+  updateSerial();
+
+  mySerial.write(26);   // CTRL+Z → enviar
+
+  Serial.println("--- SMS ENVIADO. ESPERANDO CONFIRMACION... ---");
+  updateSerial(3000);
+}
+
+/* =====================
+       UPDATE SERIAL
+   =====================*/
+void updateSerial(int wait) {
+  delay(wait);
+  while (mySerial.available()) {
+    Serial.write(mySerial.read());
+  }
+}
